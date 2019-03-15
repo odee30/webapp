@@ -63,6 +63,58 @@ resource "azurerm_subnet_network_security_group_association" "vm_snet_nsg" {
 }
 
 
+resource "azurerm_automation_account" "auto_acct" {
+  name = "svcendpoint-core-uks-aa"
+  resource_group_name = "${azurerm_resource_group.rg.name}"
+  location = "${azurerm_resource_group.rg.location}"
+
+  sku {
+    name = "Basic"
+  }
+
+  # provisioner "local-exec" {
+  #   command = "pwsh-preview /users/olie/documents/terraform/webapp/scripts/New-RunAsAccount.ps1 -ResourceGroup ${azurerm_resource_group.rg.name} -AutomationAccountName ${azurerm_automation_account.auto_acct.name} -SubscriptionId bec2e345-66d9-4c18-93e0-6e37990e6aec -ApplicationDisplayName AutomationRunAsKeyVault -SelfSignedCertPlainPassword ${"b8M%FfBs7yule!hM"}"
+  # }
+}
+
+
+locals {
+  test = 0
+}
+
+
+
+resource "azurerm_automation_runbook" "auto_rbook" {
+  name                = "${azurerm_automation_account.auto_acct.name}-rbk"
+  resource_group_name = "${azurerm_resource_group.rg.name}"
+  location            = "${azurerm_resource_group.rg.location}"
+
+  account_name = "${azurerm_automation_account.auto_acct.name}"
+  log_verbose  = true
+  log_progress = true
+  description  = "Automates resource key rotation and updates to the key vault."
+  runbook_type = "PowerShell"
+
+  publish_content_link {
+    uri = "https://raw.githubusercontent.com/odee30/keyvaultscripts/master/Rotate-Keys.ps1"
+  }
+
+  # content = ""
+}
+
+
+resource "azurerm_automation_module" "auto_module_kv" {
+  name = "AzureRM.KeyVault"
+  resource_group_name = "${azurerm_resource_group.rg.name}"
+  automation_account_name = "${azurerm_automation_account.auto_acct.name}"
+
+  module_link {
+    uri = "https://www.powershellgallery.com/api/v2/package/AzureRM.KeyVault/5.2.1"
+  }
+}
+
+
+
 resource "azurerm_key_vault" "kv" {
   name                = "svcendpoint-core-uks-kv"
   resource_group_name = "${azurerm_resource_group.rg.name}"
@@ -129,9 +181,9 @@ resource "azurerm_key_vault" "kv" {
   }
 
   network_acls {
-    default_action = "Deny"
-    bypass         = "None"
-    ip_rules       = ["94.12.211.79/32"]
+    default_action             = "Deny"
+    bypass                     = "None"
+    ip_rules                   = ["94.12.211.79/32"]
     virtual_network_subnet_ids = ["${azurerm_subnet.snet_vm.id}"]
   }
 }
@@ -158,8 +210,15 @@ resource "azurerm_storage_account" "storage" {
 }
 
 
+resource "azurerm_key_vault_secret" "storage_key" {
+  name         = "${azurerm_storage_account.storage.name}-primary-access-key"
+  value        = "${azurerm_storage_account.storage.primary_access_key}"
+  key_vault_id = "${azurerm_key_vault.kv.id}"
+}
+
+
 resource "azurerm_storage_container" "container" {
-  name                 = "container1"
+  name                 = "automationscripts"
   resource_group_name  = "${azurerm_resource_group.rg.name}"
   storage_account_name = "${azurerm_storage_account.storage.name}"  
 }
@@ -201,40 +260,40 @@ resource "azurerm_key_vault_secret" "vm_password" {
 }
 
 
-resource "azurerm_virtual_machine" "vm" {
-  name                  = "azuksclient1-vm"
-  location              = "${azurerm_resource_group.rg.location}"
-  resource_group_name   = "${azurerm_resource_group.rg.name}"
+# resource "azurerm_virtual_machine" "vm" {
+#   name                  = "azuksclient1-vm"
+#   location              = "${azurerm_resource_group.rg.location}"
+#   resource_group_name   = "${azurerm_resource_group.rg.name}"
 
-  network_interface_ids = ["${azurerm_network_interface.nic.id}"]
-  vm_size               = "Standard_DS1_v2"
+#   network_interface_ids = ["${azurerm_network_interface.nic.id}"]
+#   vm_size               = "Standard_DS1_v2"
 
-  delete_os_disk_on_termination    = true
-  delete_data_disks_on_termination = true
+#   delete_os_disk_on_termination    = true
+#   delete_data_disks_on_termination = true
 
-  storage_image_reference {
-    publisher = "MicrosoftWindowsServer"
-    offer     = "WindowsServer"
-    sku       = "2016-Datacenter"
-    version   = "latest"
-  }
+#   storage_image_reference {
+#     publisher = "MicrosoftWindowsServer"
+#     offer     = "WindowsServer"
+#     sku       = "2016-Datacenter"
+#     version   = "latest"
+#   }
 
-  storage_os_disk {
-    name              = "azuksclient1-osdisk"
-    caching           = "ReadWrite"
-    create_option     = "FromImage"
-    managed_disk_type = "Standard_LRS"
-  }
+#   storage_os_disk {
+#     name              = "azuksclient1-osdisk"
+#     caching           = "ReadWrite"
+#     create_option     = "FromImage"
+#     managed_disk_type = "Standard_LRS"
+#   }
 
-  os_profile {
-    computer_name  = "azuksclient1"
-    admin_username = "denyer.admin"
-    admin_password = "${random_string.vm_password.result}"
-  }
+#   os_profile {
+#     computer_name  = "azuksclient1"
+#     admin_username = "denyer.admin"
+#     admin_password = "${random_string.vm_password.result}"
+#   }
 
-  os_profile_windows_config {
-    provision_vm_agent        = true
-    enable_automatic_upgrades = true
-    timezone                  = "GMT Standard Time"
-  }
-}
+#   os_profile_windows_config {
+#     provision_vm_agent        = true
+#     enable_automatic_upgrades = true
+#     timezone                  = "GMT Standard Time"
+#   }
+# }
