@@ -1,6 +1,11 @@
+locals {
+  subscription_id = "bec2e345-66d9-4c18-93e0-6e37990e6aec"
+}
+
+
 provider "azurerm" {
   version         = "=1.23.0"
-  subscription_id = "bec2e345-66d9-4c18-93e0-6e37990e6aec"
+  subscription_id = "${local.subscription_id}"
 }
 
 
@@ -64,7 +69,7 @@ resource "azurerm_subnet_network_security_group_association" "vm_snet_nsg" {
 
 
 resource "azurerm_automation_account" "auto_acct" {
-  name = "svcendpoint-core-uks-aa"
+  name = "svcendpoint-core-uks-aab"
   resource_group_name = "${azurerm_resource_group.rg.name}"
   location = "${azurerm_resource_group.rg.location}"
 
@@ -72,16 +77,12 @@ resource "azurerm_automation_account" "auto_acct" {
     name = "Basic"
   }
 
-  # provisioner "local-exec" {
-  #   command = "pwsh-preview /users/olie/documents/terraform/webapp/scripts/New-RunAsAccount.ps1 -ResourceGroup ${azurerm_resource_group.rg.name} -AutomationAccountName ${azurerm_automation_account.auto_acct.name} -SubscriptionId bec2e345-66d9-4c18-93e0-6e37990e6aec -ApplicationDisplayName AutomationRunAsKeyVault -SelfSignedCertPlainPassword ${"b8M%FfBs7yule!hM"}"
-  # }
+  # Create RunAsAccount using PowerShell.  AzureRM provider does not currently support creation of this resource type.
+  provisioner "local-exec" {
+    command = "powershell.exe C:\\Users\\olied\\webapp\\scripts\\New-RunAsAccount.ps1 -ResourceGroup ${azurerm_resource_group.rg.name} -AutomationAccountName ${azurerm_automation_account.auto_acct.name} -SubscriptionId ${local.subscription_id} -ApplicationDisplayName AutomationRunAsKeyVault -SelfSignedCertPlainPassword ${"b8M%FfBs7yule!hM"}"
+    interpreter = ["PowerShell"]
+  }
 }
-
-
-locals {
-  test = 0
-}
-
 
 
 resource "azurerm_automation_runbook" "auto_rbook" {

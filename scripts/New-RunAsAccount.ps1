@@ -97,9 +97,8 @@ if (!(($AzureRMProfileVersion.Major -ge 3 -and $AzureRMProfileVersion.Minor -ge 
     return
 }
 
-# Connect-AzureRmAccount -Environment $EnvironmentName 
-# $Subscription = Select-AzureRmSubscription -SubscriptionId $SubscriptionId
-$Subscription = "bec2e345-66d9-4c18-93e0-6e37990e6aec"
+Connect-AzureRmAccount -Environment $EnvironmentName 
+$Subscription = Select-AzureRmSubscription -SubscriptionId $SubscriptionId
 $CreateClassicRunAsAccount = $false
 
 # Create a Run As account by using a service principal
